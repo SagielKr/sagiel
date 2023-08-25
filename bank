@@ -1,0 +1,659 @@
+struct UserData {
+    int id{};
+    int pincode{};
+    double balance = 0;
+};
+
+struct AtmSortMoney {
+    int ten = 0;
+    int fifty = 0;
+    int one_hundred = 0;
+    int two_hundred = 0;
+    int five_hundred = 0;
+    int one_thousand = 0;
+    int two_thousand = 0;
+    int five_thousand = 0;
+};
+
+
+class Atm {
+public:
+    Atm(const AtmSortMoney &totalBalance);
+
+    bool login(int id, int pincode);
+    void logout();
+    int registration(int pincode);
+
+    // Основные методы
+    double getBalance();
+    bool sendMoney(int id, double amount);
+    bool putMoney(int id, AtmSortMoney& money);
+    AtmSortMoney* getMoney(int amount, int& rest);
+
+    // Current user data
+    int getMyId();
+
+
+    // utils
+    std::vector<int> getUserList();
+
+private:
+    void save(UserData* user);
+    UserData* load(int id);
+    bool is_exist_user(int id);
+
+    AtmSortMoney total_balance;
+    UserData* current_user = nullptr;
+    const char *users_folder = "./users";
+};
+
+
+
+Atm::Atm(const AtmSortMoney &totalBalance)
+{
+    total_balance = totalBalance;
+    srand(time(nullptr));
+}
+
+bool Atm::login(int id, int pincode)
+{
+    if (is_exist_user(id))
+    {
+        UserData* user = load(id);
+
+        if (user->pincode != pincode)
+            return false;
+
+        current_user = user;
+        return true;
+    }
+    return false;
+}
+
+int Atm::registration(int pincode)
+{
+    UserData* new_user = new UserData;
+    new_user->id = 0 + rand() % 999999;
+    new_user->pincode = pincode;
+
+    save(new_user);
+    int id = new_user->id;
+    delete new_user;
+
+    return id;
+}
+
+double Atm::getBalance()
+{
+    if (current_user != nullptr )
+    {
+        return current_user->balance;
+    }
+    else
+        return 0;
+}
+
+int Atm::getMyId() {
+    return current_user->id;
+}
+
+void Atm::logout()
+{
+    save(current_user);
+    current_user = nullptr;
+}
+
+bool Atm::sendMoney(int id, double amount)
+{
+    if (current_user->balance < amount)
+        return false;
+
+    if (current_user->id == id)
+        return false;
+
+
+    if (is_exist_user(id))
+    {
+        UserData* receiver = load(id);
+
+        current_user->balance -= amount;
+        receiver->balance += amount;
+
+        save(current_user);
+        save(receiver);
+        return true;
+    }
+    return false;
+}
+
+bool Atm::putMoney(int id, AtmSortMoney& money)
+{
+    if (!is_exist_user(id))
+        return false;
+
+    // заполняем банкомат
+    total_balance.ten += money.ten;
+    total_balance.fifty += money.fifty;
+    total_balance.one_hundred += money.one_hundred;
+    total_balance.two_hundred += money.two_hundred;
+    total_balance.five_hundred += money.five_hundred;
+    total_balance.one_thousand += money.one_thousand;
+    total_balance.two_thousand += money.two_thousand;
+    total_balance.five_thousand += money.five_thousand;
+
+    // пополняем баланс пользователя
+    UserData* receiver = load(id);
+    receiver->balance +=
+    (
+        money.ten * 10 +
+        money.fifty * 50 +
+        money.one_hundred * 100 +
+        money.two_hundred * 200 +
+        money.five_hundred * 500 +
+        money.one_thousand * 1000 +
+        money.two_thousand * 2000 +
+        money.five_thousand * 5000
+    );
+    save(receiver);
+
+    if (current_user != nullptr && current_user->id == id)
+        current_user->balance = receiver->balance;
+
+    delete receiver;
+    return true;
+}
+
+AtmSortMoney* Atm::getMoney(int amount, int& rest)
+{
+    rest = 0;
+
+    // проверка
+    int balance_in_atm =
+    (
+        total_balance.ten * 10 +
+        total_balance.fifty * 50 +
+        total_balance.one_hundred * 100 +
+        total_balance.two_hundred * 200 +
+        total_balance.five_hundred * 500 +
+        total_balance.one_thousand * 1000 +
+        total_balance.two_thousand * 2000 +
+        total_balance.five_thousand * 5000
+    );
+
+    if (balance_in_atm < amount)
+        return nullptr;
+
+    if (current_user->balance < amount)
+        return nullptr;
+
+    // алг
+    auto *resp_money = new AtmSortMoney;
+    while(amount >= 5000)
+    {
+        if (total_balance.five_thousand != 0)
+        {
+            amount -= 5000;
+            current_user->balance -= 5000;
+            total_balance.five_thousand--;
+            resp_money->five_thousand++;
+        } else
+            break;
+    };
+    while(amount >= 2000)
+    {
+        if (total_balance.two_thousand != 0)
+        {
+            amount -= 2000;
+            current_user->balance -= 2000;
+            total_balance.two_thousand--;
+            resp_money->two_thousand++;
+        } else
+            break;
+
+    };
+    while(amount >= 1000)
+    {
+        if (total_balance.one_thousand != 0)
+        {
+            amount -= 1000;
+            current_user->balance -= 1000;
+            total_balance.one_thousand--;
+            resp_money->one_thousand++;
+        } else
+            break;
+    };
+    while(amount >= 500)
+    {
+        if (total_balance.five_hundred != 0)
+        {
+            amount -= 500;
+            current_user->balance -= 500;
+            total_balance.five_hundred--;
+            resp_money->five_hundred++;
+        } else
+            break;
+    };
+    while(amount >= 200)
+    {
+        if (total_balance.two_hundred != 0)
+        {
+            amount -= 200;
+            current_user->balance -= 200;
+            total_balance.two_hundred--;
+            resp_money->two_hundred++;
+        } else
+            break;
+    };
+    while(amount >= 100)
+    {
+        if (total_balance.one_hundred != 0)
+        {
+            amount -= 100;
+            current_user->balance -= 100;
+            total_balance.one_hundred--;
+            resp_money->one_hundred++;
+        } else
+            break;
+    };
+    while(amount >= 50)
+    {
+        if (total_balance.fifty != 0)
+        {
+            amount -= 50;
+            current_user->balance -= 50;
+            total_balance.fifty--;
+            resp_money->fifty++;
+        } else
+            break;
+    };
+    while(amount >= 10)
+    {
+        if (total_balance.ten != 0)
+        {
+            amount -= 10;
+            current_user->balance -= 10;
+            total_balance.ten--;
+            resp_money->ten++;
+        } else
+            break;
+    };
+    save(current_user);
+
+    rest = amount;
+    return resp_money;
+}
+
+Листинг Б.2 – Исходный код графической обработки
+QT_BEGIN_NAMESPACE
+namespace Ui { class MainWindow; }
+QT_END_NAMESPACE
+
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+
+
+public:
+    MainWindow(QWidget *parent = nullptr);
+    ~MainWindow();
+
+private slots:
+
+    void on_pushButton_auth_clicked();
+
+    void on_pushButton_registr_clicked();
+
+    void on_pushButton_logout_clicked();
+
+
+    void on_pushButton_getMoney_clicked();
+
+    void on_pushButton_putMoney_clicked();
+
+    void on_pushButton_sendMoney_clicked();
+
+    void on_signIn_clicked();
+
+    void on_signUp_clicked();
+
+    void on_pushButton_2_clicked();
+
+    void on_pushButton_3_clicked();
+
+    void on_pushButton_4_clicked();
+
+    void on_pushButton_20_clicked();
+
+    void on_pushButton_5_clicked();
+
+    void on_pushButton_6_clicked();
+
+    void on_pushButton_19_clicked();
+
+    void on_pushButton_21_clicked();
+
+    void on_pushButton_22_clicked();
+
+    void on_pushButton_clicked();
+
+    void on_pushButton_profile_clicked();
+
+    void on_sendMoney_button_clicked();
+
+    void on_getMoney_button_clicked();
+
+private:
+    void show_profile();
+
+
+    AtmSortMoney* putMoneyTemp = NULL;
+    Atm* atm = NULL;
+    QLineEdit* current_lineEdit = NULL;
+    Ui::MainWindow *ui;
+};
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+    , ui(new Ui::MainWindow)
+{
+    ui->setupUi(this);
+
+    // установка lyout'ов
+    this->setCentralWidget(ui->verticalLayoutWidget_4);
+    ui->keyboard->setLayout(ui->gridLayout);
+
+    ui->tabWidget->widget(0)->setLayout(ui->horizontalLayout_4);
+    ui->tabWidget->widget(1)->setLayout(ui->horizontalLayout_5);
+    ui->tabWidget->widget(2)->setLayout(ui->horizontalLayout_3);
+    ui->tabWidget->widget(3)->setLayout(ui->horizontalLayout_6);
+    ui->tabWidget->widget(4)->setLayout(ui->horizontalLayout_7);
+    ui->tabWidget->widget(5)->setLayout(ui->horizontalLayout_8);
+
+
+    // скрытие вкладок от пользователя
+    ui->tabWidget->setStyleSheet("QTabBar::tab {width: 0;height: 0;margin: 0;padding: 0;border: none;};");
+
+    // отключение кнопок
+    ui->pushButton_logout->setEnabled(false);
+    ui->pushButton_getMoney->setEnabled(false);
+    ui->pushButton_sendMoney->setEnabled(false);
+    ui->pushButton_profile->setEnabled(false);
+
+    ui->tabWidget->setCurrentIndex(0);
+
+    // Инициализация банкомата (заполнение первоначальных денег)
+    AtmSortMoney total_money;
+    total_money.ten = 4;
+    total_money.fifty = 34;
+    total_money.one_hundred = 42;
+    total_money.two_hundred = 15;
+    total_money.five_hundred = 2;
+    total_money.one_thousand = 34;
+    total_money.two_thousand = 1;
+    total_money.five_thousand = 34;
+
+    this->atm = new Atm(total_money);
+}
+
+MainWindow::~MainWindow()
+{
+    delete ui;
+}
+
+
+
+void MainWindow::on_pushButton_auth_clicked()
+{
+    ui->tabWidget->setCurrentIndex(0);
+
+    ui->lineEdit_id->setText("");
+    ui->lineEdit_pincode->setText("");
+}
+
+
+void MainWindow::on_pushButton_registr_clicked()
+{
+    ui->tabWidget->setCurrentIndex(1);
+
+    ui->lineEdit_pincode_2->setText("");
+}
+
+
+void MainWindow::on_pushButton_profile_clicked()
+{
+    show_profile();
+}
+
+void MainWindow::on_pushButton_logout_clicked()
+{
+    ui->pushButton_auth->setEnabled(true);
+    ui->pushButton_registr->setEnabled(true);
+
+    ui->pushButton_logout->setEnabled(false);
+    ui->pushButton_getMoney->setEnabled(false);
+    ui->pushButton_sendMoney->setEnabled(false);
+    ui->pushButton_profile->setEnabled(false);
+
+
+    ui->tabWidget->setCurrentIndex(0);
+    atm->logout();
+}
+
+
+void MainWindow::on_pushButton_getMoney_clicked()
+{
+    ui->tabWidget->setCurrentIndex(3);
+    ui->lineEdit_sum_4->setText("");
+}
+
+
+void MainWindow::on_pushButton_putMoney_clicked()
+{
+    ui->tabWidget->setCurrentIndex(4);
+
+    if (putMoneyTemp != NULL)
+        delete putMoneyTemp;
+    putMoneyTemp = new AtmSortMoney;
+
+    ui->lineEdit_2->setText("");
+    ui->lineEdit->setText("");
+
+}
+
+
+void MainWindow::on_pushButton_sendMoney_clicked()
+{
+    ui->tabWidget->setCurrentIndex(5);
+    ui->lineEdit_id_5->setText("");
+    ui->lineEdit_sum_5->setText("");
+
+}
+
+void MainWindow::show_profile()
+{
+    ui->tabWidget->setCurrentIndex(2);
+
+    // Установка данных
+    ui->id_lable->setText(QString::fromStdString(std::to_string(atm->getMyId())));
+    ui->balance_lable->setText(QString::fromStdString(std::to_string(atm->getBalance())));
+
+
+
+}
+
+
+
+void MainWindow::on_signIn_clicked()
+{
+    int id = ui->lineEdit_id->displayText().toInt();
+    int pin = ui->lineEdit_pincode->displayText().toInt();
+
+    if (this->atm->login(id,pin))
+    {
+        ui->pushButton_auth->setEnabled(false);
+        ui->pushButton_registr->setEnabled(false);
+
+        ui->pushButton_logout->setEnabled(true);
+        ui->pushButton_getMoney->setEnabled(true);
+        ui->pushButton_sendMoney->setEnabled(true);
+        ui->pushButton_profile->setEnabled(true);
+
+        show_profile();
+    }else
+        QMessageBox::warning(0, "Ошибка","Ид или пикод - неверны");
+
+}
+
+
+void MainWindow::on_signUp_clicked()
+{
+    int pin = ui->lineEdit_pincode_2->displayText().toInt();
+    int id = this->atm->registration(pin);
+
+    QMessageBox msgBox;
+    msgBox.setText("Регистрация прошла успешно!");
+    msgBox.setInformativeText("ID: " + QString::fromStdString(std::to_string(id)) + "\nPinCode: " + QString::fromStdString(std::to_string(pin)) + "\nЗапомните эти данные, они нужны для авторизации");
+    msgBox.setStandardButtons(QMessageBox::Ok);
+    msgBox.setIcon(QMessageBox::Information);
+    msgBox.setDefaultButton(QMessageBox::Ok);
+    int res = msgBox.exec();
+    if (res == QMessageBox::Ok) //нажата кнопка Ok
+        ui->tabWidget->setCurrentIndex(0);
+
+
+}
+
+
+void MainWindow::on_pushButton_2_clicked()
+{
+    putMoneyTemp->ten += 1;
+    ui->lineEdit_2->setText(QString::fromStdString(std::to_string(ui->lineEdit_2->displayText().toInt() + 10)));
+}
+
+
+void MainWindow::on_pushButton_3_clicked()
+{
+    putMoneyTemp->fifty += 1;
+    ui->lineEdit_2->setText(QString::fromStdString(std::to_string(ui->lineEdit_2->displayText().toInt() + 50)));
+}
+
+
+void MainWindow::on_pushButton_4_clicked()
+{
+    putMoneyTemp->one_hundred += 1;
+    ui->lineEdit_2->setText(QString::fromStdString(std::to_string(ui->lineEdit_2->displayText().toInt() + 100)));
+}
+
+
+void MainWindow::on_pushButton_20_clicked()
+{
+    putMoneyTemp->two_hundred += 1;
+    ui->lineEdit_2->setText(QString::fromStdString(std::to_string(ui->lineEdit_2->displayText().toInt() + 200)));
+}
+
+
+void MainWindow::on_pushButton_5_clicked()
+{
+    putMoneyTemp->five_hundred += 1;
+    ui->lineEdit_2->setText(QString::fromStdString(std::to_string(ui->lineEdit_2->displayText().toInt() + 500)));
+}
+
+
+void MainWindow::on_pushButton_6_clicked()
+{
+    putMoneyTemp->one_thousand += 1;
+    ui->lineEdit_2->setText(QString::fromStdString(std::to_string(ui->lineEdit_2->displayText().toInt() + 1000)));
+}
+
+
+void MainWindow::on_pushButton_19_clicked()
+{
+    putMoneyTemp->two_thousand += 1;
+    ui->lineEdit_2->setText(QString::fromStdString(std::to_string(ui->lineEdit_2->displayText().toInt() + 2000)));
+}
+
+
+void MainWindow::on_pushButton_21_clicked()
+{
+    putMoneyTemp->five_thousand += 1;
+    ui->lineEdit_2->setText(QString::fromStdString(std::to_string(ui->lineEdit_2->displayText().toInt() + 5000)));
+}
+
+
+void MainWindow::on_pushButton_22_clicked()
+{
+    if (putMoneyTemp != NULL)
+        delete putMoneyTemp;
+    putMoneyTemp = new AtmSortMoney;
+    ui->lineEdit_2->setText("");
+}
+
+
+void MainWindow::on_pushButton_clicked()
+{
+    int id = ui->lineEdit->displayText().toInt();
+    if (ui->lineEdit_2->displayText() != "")
+    {
+        if (atm->putMoney(id, *putMoneyTemp))
+            QMessageBox::information(0, "Успех","Успешно переведено " + ui->lineEdit_2->displayText()  + " руб!");
+        else
+            QMessageBox::warning(0, "Ошибка","Пользователь не найден!");
+    } else
+        QMessageBox::warning(0, "Ошибка","Для начала введите сумму перевода!");
+
+}
+
+
+
+
+void MainWindow::on_sendMoney_button_clicked()
+{
+    int id = ui->lineEdit_id_5->displayText().toInt();
+    int sum = ui->lineEdit_sum_5->displayText().toInt();
+
+    if (atm->sendMoney(id,sum))
+    {
+        QMessageBox::information(0, "Успех", "Успешный перевод средств!");
+    }
+    else
+    {
+        QMessageBox::critical(0, "Ошибка", "Не удалось перевести деньги :(");
+    }
+}
+
+
+void MainWindow::on_getMoney_button_clicked()
+{
+    int sum = ui->lineEdit_sum_4->displayText().toInt();
+    int rest = 0;
+
+    AtmSortMoney* resp = atm->getMoney(sum, rest);
+
+    if (resp != nullptr)
+    {
+        QString info =
+                "10-рублевых: " + QString::fromStdString(std::to_string(resp->ten)) +
+                "\n50-рублевых: "+ QString::fromStdString(std::to_string(resp->fifty)) +
+                "\n100-рублевых: " + QString::fromStdString(std::to_string(resp->one_hundred)) +
+                "\n200-рублевых: "+ QString::fromStdString(std::to_string(resp->two_hundred)) +
+                "\n500-рублевых: " + QString::fromStdString(std::to_string(resp->five_hundred)) +
+                "\n1000-рублевых: "+ QString::fromStdString(std::to_string(resp->one_thousand)) +
+                "\n2000-рублевых: " + QString::fromStdString(std::to_string(resp->two_thousand)) +
+                "\n5000-рублевых: "+ QString::fromStdString(std::to_string(resp->five_thousand));
+
+        if (rest != 0)
+        {
+            info += "\nНе получилось снять: " + QString::fromStdString(std::to_string(rest)) + " руб (Недостаточно купюр!)";
+        }
+
+        QMessageBox::information(0, "Успех", info);
+    } else
+    {
+        if (atm->getBalance() < sum)
+            QMessageBox::critical(0, "Ошибка", "Вы не можете снять больше денег, чем у Вас есть!");
+        else
+            QMessageBox::critical(0, "Ошибка", "В банкомате недостаточно средств для снятия!");
+
+    }
+}
